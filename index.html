@@ -37,6 +37,9 @@
       }
     </script>
     
+    <!-- Google Variables -->
+    <script src="config.js"></script>
+    
     <!-- Babel Standalone for in-browser JSX/TS compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -108,7 +111,22 @@
 
       // --- CONFIGURATION ---
       // Ensure this API key is valid for Gemini 2.5 Flash
-      window.process = { env: { API_KEY: 'AIzaSyDPs9qTkKouRflWQ3GttRuR3l0C8S-M_c0' } };
+        // OUTDDATED
+      <!-- window.process = { env: { API_KEY: 'AIzaSyDPs9qTkKouRflWQ3GttRuR3l0C8S-M_c0' } }; -->
+        //OUTDATED END
+      
+        // --- CONFIGURATION ---
+        // Ensure this API key is valid for Gemini 2.5 Flash
+        // API key is injected at deploy time via config.js
+        window.process = window.process || {};
+        window.process.env = window.process.env || {};
+
+        if (window.GOOGLE_API_KEY) {
+          window.process.env.API_KEY = window.GOOGLE_API_KEY;
+        } else {
+          console.warn("API key missing — check config.js / GitHub secret.");
+        }
+
   
 
 
