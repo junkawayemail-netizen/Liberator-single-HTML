@@ -42,6 +42,8 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Create config.js
-        run: | 
-          echo "window.GOOGLE_API_KEY = '${{ secrets.GEMINI_API_KEY }}';" > config.js
+        run: |
+          cat > config.js << 'EOF'
+          window.GOOGLE_API_KEY = "${{ secrets.GEMINI_API_KEY }}";
+          EOF
 
