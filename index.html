@@ -115,9 +115,26 @@
 
       if (window.LIBERATOR_API_KEY) {
         window.process.env.API_KEY = window.LIBERATOR_API_KEY;
-      } else {
-        console.warn("API key missing — check config.js / GitHub secret.");
       }
+      if (window.GOOGLE_API_KEY) {
+        window.process.env.API_KEY = window.GOOGLE_API_KEY;
+      } 
+
+      // Helper to get API key safely
+      const getApiKey = () => {
+        const apiKey =
+          (window.process &&
+            window.process.env &&
+            window.process.env.API_KEY) ||
+          window.GOOGLE_API_KEY || 
+          window.LIBERATOR_API_KEY;
+
+        if (!apiKey) {
+          console.error("No Gemini API key found on window.process.env.API_KEY, window.GOOGLE_API_KEY or window.LIBERATOR_API_KEY");
+          return null;
+        }
+        return apiKey;
+      };
 
       // --- CONSTANTS ---
       const NAV_LINKS = [
@@ -176,7 +193,7 @@
 
       const TEAM = [
         { imgSrc: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop", name: 'Alex "Commander" Chen', role: "Founder & Lead Strategist" },
-        { imgSrc: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit	crop", name: 'Maria "Breaker" Garcia', role: "Operations Specialist" },
+        { imgSrc: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", name: 'Maria "Breaker" Garcia', role: "Operations Specialist" },
         { imgSrc: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400&auto=format&fit=crop", name: 'Sam "Gadget" Jones', role: "Eco-Disposal Expert" },
         { imgSrc: "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400&auto=format&fit=crop", name: "Jessica Riley", role: "Customer Relations" }
       ];
@@ -580,19 +597,44 @@
       };
 
       const AIEstimator = ({ onBookNow }) => {
-        const [description, setDescription] = useState(''); const [image, setImage] = useState(null); const [imagePreview, setImagePreview] = useState(null); const [loading, setLoading] = useState(false); const [result, setResult] = useState(null); const fileInputRef = useRef(null);
-        const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; setImage(file); const reader = new FileReader(); reader.onloadend = () => setImagePreview(reader.result); reader.readAsDataURL(file); } };
+        const [description, setDescription] = useState('');
+        const [image, setImage] = useState(null);
+        const [imagePreview, setImagePreview] = useState(null);
+        const [loading, setLoading] = useState(false);
+        const [result, setResult] = useState(null);
+        const fileInputRef = useRef(null);
+
+        const handleFileChange = (e) => {
+          if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImage(file);
+            const reader = new FileReader();
+            reader.onloadend = () => setImagePreview(reader.result);
+            reader.readAsDataURL(file);
+          }
+        };
+
         const generateEstimate = async () => {
-          if (!description && !image) return; setLoading(true); setResult(null);
+          if (!description && !image) return;
+
+          const apiKey = getApiKey();
+          if (!apiKey) {
+            setResult("Missing API key in browser – check config.js / GitHub secret.");
+            return;
+          }
+
+          setLoading(true);
+          setResult(null);
+
           try {
-            const ai = new GoogleGenAI({ apiKey: window.process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
             const parts = []; if (image) { const reader = new FileReader(); await new Promise(r => { reader.onloadend = () => { parts.push({ inlineData: { data: reader.result.split(',')[1], mimeType: image.type } }); r(); }; reader.readAsDataURL(image); }); }
             parts.push({ text: `Analyze intel. Estimate junk removal cost for: ${description}. Check for heavy items (concrete/piano) and add $0.20/lb surcharge. Show base + surcharge math.` });
             const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts }, config: { systemInstruction: 'You are "The General". Concise. Show the math.', thinkingConfig: { thinkingBudget: 0 } } });
             setResult(response.text);
           } catch (e) {
             console.error("Gemini API error:", e);
-            setResult("AI error – see console for details.");
+            setResult("AI error – see console for details (check DevTools).");
           } finally {
             setLoading(false);
           }
@@ -895,16 +937,26 @@
         const [description, setDescription] = useState(''); const [image, setImage] = useState(null); const [imagePreview, setImagePreview] = useState(null); const [loading, setLoading] = useState(false); const [result, setResult] = useState(null); const fileInputRef = useRef(null);
         const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; setImage(file); const reader = new FileReader(); reader.onloadend = () => setImagePreview(reader.result); reader.readAsDataURL(file); } };
         const generateEstimate = async () => {
-          if (!description && !image) return; setLoading(true); setResult(null);
+          if (!description && !image) return; 
+          
+          const apiKey = getApiKey();
+          if (!apiKey) {
+            setResult("Missing API key in browser – check config.js / GitHub secret.");
+            return;
+          }
+
+          setLoading(true); 
+          setResult(null);
+          
           try {
-            const ai = new GoogleGenAI({ apiKey: window.process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
             const parts = []; if (image) { const reader = new FileReader(); await new Promise(r => { reader.onloadend = () => { parts.push({ inlineData: { data: reader.result.split(',')[1], mimeType: image.type } }); r(); }; reader.readAsDataURL(image); }); }
             parts.push({ text: `Analyze intel. Estimate junk removal cost for: ${description}. Check for heavy items (concrete/piano) and add $0.20/lb surcharge. Show base + surcharge math.` });
             const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts }, config: { systemInstruction: 'You are "The General". Concise. Show the math.', thinkingConfig: { thinkingBudget: 0 } } });
             setResult(response.text);
           } catch (e) {
             console.error("Gemini API error:", e);
-            setResult("AI error – see console for details.");
+            setResult("AI error – see console for details (check DevTools).");
           } finally {
             setLoading(false);
           }
