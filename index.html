@@ -109,32 +109,33 @@
       import { motion, AnimatePresence } from 'framer-motion';
       import { GoogleGenAI } from "@google/genai";
 
-      // --- CONFIGURATION ---
-      window.process = window.process || {};
-      window.process.env = window.process.env || {};
-
-      if (window.LIBERATOR_API_KEY) {
-        window.process.env.API_KEY = window.LIBERATOR_API_KEY;
-      }
-      if (window.GOOGLE_API_KEY) {
-        window.process.env.API_KEY = window.GOOGLE_API_KEY;
-      } 
-
-      // Helper to get API key safely
-      const getApiKey = () => {
-        const apiKey =
-          (window.process &&
-            window.process.env &&
-            window.process.env.API_KEY) ||
-          window.GOOGLE_API_KEY || 
-          window.LIBERATOR_API_KEY;
-
-        if (!apiKey) {
-          console.error("No Gemini API key found on window.process.env.API_KEY, window.GOOGLE_API_KEY or window.LIBERATOR_API_KEY");
-          return null;
+              // --- CONFIGURATION ---
+        window.process = window.process || {};
+        window.process.env = window.process.env || {};
+        
+        // Our ONLY key provided by GitHub Actions via config.js
+        if (window.GEMINI_API_KEY) {
+          window.process.env.API_KEY = window.GEMINI_API_KEY;
+        } else {
+          console.error("GEMINI_API_KEY is missing! Check config.js and GitHub Actions secret.");
         }
-        return apiKey;
-      };
+        
+        // Helper to get API key safely
+        const getApiKey = () => {
+          const apiKey =
+            (window.process &&
+              window.process.env &&
+              window.process.env.API_KEY) ||
+            window.GEMINI_API_KEY;
+        
+          if (!apiKey) {
+            console.error("No API key found. Expected window.GEMINI_API_KEY.");
+            return null;
+          }
+        
+          console.log("Gemini API key loaded (first 6 chars):", apiKey.slice(0, 6));
+          return apiKey;
+        };
 
       // --- CONSTANTS ---
       const NAV_LINKS = [
