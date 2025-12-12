@@ -40,6 +40,9 @@
     <!-- Config Loading -->
     <script src="config.js"></script>
     
+    <!-- jsPDF for client-side PDF generation -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
     <!-- Babel Standalone for in-browser JSX/TS compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -109,33 +112,32 @@
       import { motion, AnimatePresence } from 'framer-motion';
       import { GoogleGenAI } from "@google/genai";
 
-              // --- CONFIGURATION ---
-        window.process = window.process || {};
-        window.process.env = window.process.env || {};
-        
-        // Our ONLY key provided by GitHub Actions via config.js
-        if (window.GEMINI_API_KEY) {
-          window.process.env.API_KEY = window.GEMINI_API_KEY;
-        } else {
-          console.error("GEMINI_API_KEY is missing! Check config.js and GitHub Actions secret.");
+      // --- CONFIGURATION ---
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+
+      if (window.LIBERATOR_API_KEY) {
+        window.process.env.API_KEY = window.LIBERATOR_API_KEY;
+      }
+      if (window.GOOGLE_API_KEY) {
+        window.process.env.API_KEY = window.GOOGLE_API_KEY;
+      } 
+
+      // Helper to get API key safely
+      const getApiKey = () => {
+        const apiKey =
+          (window.process &&
+            window.process.env &&
+            window.process.env.API_KEY) ||
+          window.GOOGLE_API_KEY || 
+          window.LIBERATOR_API_KEY;
+
+        if (!apiKey) {
+          console.error("No Gemini API key found on window.process.env.API_KEY, window.GOOGLE_API_KEY or window.LIBERATOR_API_KEY");
+          return null;
         }
-        
-        // Helper to get API key safely
-        const getApiKey = () => {
-          const apiKey =
-            (window.process &&
-              window.process.env &&
-              window.process.env.API_KEY) ||
-            window.GEMINI_API_KEY;
-        
-          if (!apiKey) {
-            console.error("No API key found. Expected window.GEMINI_API_KEY.");
-            return null;
-          }
-        
-          console.log("Gemini API key loaded (first 6 chars):", apiKey.slice(0, 6));
-          return apiKey;
-        };
+        return apiKey;
+      };
 
       // --- CONSTANTS ---
       const NAV_LINKS = [
@@ -458,7 +460,7 @@
         return <canvas ref={canvasRef} className="fixed inset-0 z-[60] pointer-events-none" style={{ pointerEvents: 'none' }} />;
       };
 
-      const Header = ({ isWinter, showSnow, onToggleSnow, onOpenEstimator }) => {
+      const Header = ({ isWinter, showSnow, onToggleSnow, onOpenEstimator, onOpenQuoteGenerator }) => {
         const [isOpen, setIsOpen] = useState(false);
         const handleNavClick = (e, href) => {
           e.preventDefault(); setIsOpen(false);
@@ -499,6 +501,7 @@
                   {NAV_LINKS.map((link) => (
                     <a key={link.href} href={link.href} onClick={(e) => handleNavClick(e, link.href)} className="text-brand-dark font-medium hover:text-brand-green transition-colors duration-300 text-sm lg:text-base">{link.label}</a>
                   ))}
+                  <button onClick={(e)=>{e.preventDefault(); setIsOpen(false); onOpenQuoteGenerator && onOpenQuoteGenerator();}} className="bg-white/60 backdrop-blur-xl border border-white/50 text-brand-dark font-bold py-2 px-5 rounded-full hover:bg-white/80 transition-all duration-300 shadow-md whitespace-nowrap">PDF Quote</button>
                   <button onClick={handleQuoteClick} className="bg-brand-green/20 backdrop-blur-xl border border-white/40 text-brand-dark font-bold py-2 px-6 rounded-full hover:bg-brand-green/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-300 transform hover:scale-105 shadow-md whitespace-nowrap">Free Quote</button>
                 </nav>
                 <div className="md:hidden flex items-center space-x-2">
@@ -881,6 +884,7 @@
         const [selectedPlan, setSelectedPlan] = useState(null);
         const [isBookingOpen, setIsBookingOpen] = useState(false);
         const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
+        const [isQuoteGeneratorOpen, setIsQuoteGeneratorOpen] = useState(false);
         const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
         const [isHovered, setIsHovered] = useState(false);
         const [isWinter, setIsWinter] = useState(false);
@@ -928,6 +932,7 @@
 
             <BookingModal isOpen={isBookingOpen} onClose={() => setIsBookingOpen(false)} />
             <AIEstimatorModal isOpen={isEstimatorOpen} onClose={() => setIsEstimatorOpen(false)} onBookNow={() => { setIsEstimatorOpen(false); setIsBookingOpen(true); }} />
+            <QuoteGeneratorModal isOpen={isQuoteGeneratorOpen} onClose={() => setIsQuoteGeneratorOpen(false)} />
             <AdminLoginModal isOpen={isAdminLoginOpen} onClose={() => setIsAdminLoginOpen(false)} />
             {selectedPlan && <PaymentModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} />}
           </div>
@@ -980,6 +985,359 @@
           </AnimatePresence>
         );
       };
+
+
+      // --- PDF QUOTE GENERATOR MODAL (Client-side) ---
+      const QuoteGeneratorModal = ({ isOpen, onClose }) => {
+        const [form, setForm] = useState(() => {
+          try {
+            const saved = localStorage.getItem('quote_generator_form_v1');
+            if (saved) return JSON.parse(saved);
+          } catch(e) {}
+          return {
+            companyName: "LIBERATOR JUNK REMOVAL",
+            title: "JUNK REMOVAL QUOTE",
+            clientName: "Junk Removal Customer",
+            date: new Date().toISOString().slice(0,10),
+            fromZip: "94133",
+            toZip: "94805",
+            pickupAddress: "",
+            items: "Sofa\nOld dresser\nJunk from garage",
+            notes: "Includes labor, transportation, and disposal. Double-drive may apply depending on routing.",
+            truckCapacityYd: 14,
+            bracket: 0.5,
+            totalPrice: 399,
+            sofaCf: 42,
+            dresserCf: 30,
+            garageCf: 90,
+            vehicleCost: 35,
+            helperCost: 50,
+            dumpFee: 140,
+            miscCost: 15,
+            showSignatures: true,
+          };
+        });
+        const [logoDataUrl, setLogoDataUrl] = useState(null);
+
+        useEffect(() => {
+          try { localStorage.setItem('quote_generator_form_v1', JSON.stringify(form)); } catch(e) {}
+        }, [form]);
+
+        const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+        const calc = () => {
+          const sofa = Number(form.sofaCf)||0;
+          const dresser = Number(form.dresserCf)||0;
+          const garage = Number(form.garageCf)||0;
+          const totalCf = sofa + dresser + garage;
+          const totalYd = totalCf / 27;
+          const cap = Number(form.truckCapacityYd)||14;
+          const bracket = Number(form.bracket)||0.5;
+          const bracketYd = cap * bracket;
+
+          const vehicle = Number(form.vehicleCost)||0;
+          const helper = Number(form.helperCost)||0;
+          const dump = Number(form.dumpFee)||0;
+          const misc = Number(form.miscCost)||0;
+          const expenses = vehicle + helper + dump + misc;
+
+          return { sofa, dresser, garage, totalCf, totalYd, cap, bracket, bracketYd, vehicle, helper, dump, misc, expenses };
+        };
+
+        const onLogoChange = (file) => {
+          if (!file) { setLogoDataUrl(null); return; }
+          const reader = new FileReader();
+          reader.onloadend = () => setLogoDataUrl(reader.result);
+          reader.readAsDataURL(file);
+        };
+
+        const wrap = (doc, text, x, y, maxW, lineH) => {
+          const lines = doc.splitTextToSize(text, maxW);
+          lines.forEach(ln => { doc.text(ln, x, y); y += lineH; });
+          return y;
+        };
+
+        const generatePdf = async () => {
+          const { jsPDF } = window.jspdf || {};
+          if (!jsPDF) { alert("jsPDF not loaded. Check the CDN script tag."); return; }
+
+          const d = calc();
+          const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+          const pageW = doc.internal.pageSize.getWidth();
+          const pageH = doc.internal.pageSize.getHeight();
+          const left = 48, right = 48, top = 44;
+          const maxW = pageW - left - right;
+          let y = top;
+
+          // Header: Logo centered (optional), then company + title centered
+          if (logoDataUrl) {
+            try { doc.addImage(logoDataUrl, 'PNG', (pageW-200)/2, y, 200, 80); y += 92; } catch(e) {}
+          }
+
+          doc.setFont('helvetica','bold'); doc.setFontSize(20);
+          doc.text(form.companyName || "LIBERATOR JUNK REMOVAL", pageW/2, y, { align:'center' });
+          y += 26;
+
+          doc.setFontSize(16);
+          doc.text(form.title || "JUNK REMOVAL QUOTE", pageW/2, y, { align:'center' });
+          y += 18;
+
+          doc.setDrawColor(35, 48, 85); doc.setLineWidth(1);
+          doc.line(left, y, pageW-right, y);
+          y += 18;
+
+          // Meta row
+          doc.setFont('helvetica','normal'); doc.setFontSize(11);
+          doc.text(`Date: ${form.date || ''}`, left, y);
+          doc.text(`Client: ${form.clientName || ''}`, pageW-right, y, { align:'right' });
+          y += 16;
+
+          doc.text(`Route: ${form.fromZip || ''} → ${form.toZip || ''}`, left, y);
+          y += 16;
+
+          if (form.pickupAddress) y = wrap(doc, `Pickup: ${form.pickupAddress}`, left, y, maxW, 14);
+
+          // Scope
+          doc.setFont('helvetica','bold'); doc.setFontSize(13);
+          doc.text("Scope of Work", left, y); y += 16;
+
+          doc.setFont('helvetica','normal'); doc.setFontSize(11);
+          const itemsLines = String(form.items||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+          itemsLines.forEach(it => { doc.text(`• ${it}`, left, y); y += 14; });
+          doc.text("• Includes labor, transportation, and disposal", left, y); y += 14;
+          if (form.notes) { y += 2; y = wrap(doc, form.notes, left, y, maxW, 14); }
+          y += 10;
+
+          // Pricing + bracket
+          doc.setFont('helvetica','bold'); doc.setFontSize(13);
+          doc.text("Pricing Summary", left, y); y += 16;
+
+          doc.setFont('helvetica','normal'); doc.setFontSize(11);
+          const bracketLabel = d.bracket === 0.25 ? "1/4 Truck" : d.bracket === 0.5 ? "1/2 Truck" : d.bracket === 0.75 ? "3/4 Truck" : "Full Truck";
+          doc.text(`Bracket: ${bracketLabel} (truck ≈ ${d.cap.toFixed(0)} yd³; bracket ≈ ${d.bracketYd.toFixed(1)} yd³)`, left, y); y += 14;
+
+          // Calculations (kept short so it fits)
+          doc.setFont('helvetica','bold'); doc.text("Calculations", left, y); y += 14;
+          doc.setFont('helvetica','normal');
+          doc.text(`Volumes: Sofa ${d.sofa.toFixed(0)} ft³ + Dresser ${d.dresser.toFixed(0)} ft³ + Garage ${d.garage.toFixed(0)} ft³ = ${d.totalCf.toFixed(0)} ft³`, left, y); y += 14;
+          doc.text(`Convert: ${d.totalCf.toFixed(0)} ÷ 27 = ${d.totalYd.toFixed(1)} yd³ (fits bracket: ${d.bracketYd.toFixed(1)} yd³)`, left, y); y += 16;
+
+          // Total price bar
+          const barH = 34;
+          doc.setFillColor(0, 44, 95);
+          doc.roundedRect(left, y, maxW, barH, 10, 10, 'F');
+          doc.setTextColor(255,255,255);
+          doc.setFont('helvetica','bold'); doc.setFontSize(17);
+          doc.text("TOTAL PRICE:", left+14, y+23);
+          doc.text(`$${Math.round(Number(form.totalPrice)||0)}`, pageW-right-14, y+23, { align:'right' });
+          doc.setTextColor(0,0,0);
+          y += barH + 16;
+
+          // Signatures (optional)
+          if (form.showSignatures) {
+            doc.setFont('helvetica','bold'); doc.setFontSize(12);
+            doc.text("Signatures", left, y); y += 16;
+            doc.setFont('helvetica','normal'); doc.setFontSize(11);
+            doc.text("Customer Signature: ________________________________", left, y); y += 18;
+            doc.text("Liberator Representative: ___________________________", left, y); y += 18;
+          }
+
+          // Expense breakdown (no revenue)
+          doc.setFont('helvetica','bold'); doc.setFontSize(12);
+          doc.text("Company Expense Breakdown (Included)", left, y); y += 14;
+          doc.setFont('helvetica','normal'); doc.setFontSize(11);
+          doc.text(`• Vehicle expense: $${d.vehicle.toFixed(0)}`, left, y); y += 14;
+          doc.text(`• Helpers: $${d.helper.toFixed(0)}`, left, y); y += 14;
+          doc.text(`• Dump fee: $${d.dump.toFixed(0)}`, left, y); y += 14;
+          doc.text(`• Misc / supplies: $${d.misc.toFixed(0)}`, left, y); y += 14;
+          doc.setFont('helvetica','bold');
+          doc.text(`Total company expenses (included): $${d.expenses.toFixed(0)}`, left, y);
+
+          // Footer
+          doc.setFont('helvetica','normal'); doc.setFontSize(9);
+          doc.setTextColor(120,130,160);
+          doc.text("Liberator Junk Removal • PDF Quote", pageW/2, pageH-22, { align:'center' });
+          doc.setTextColor(0,0,0);
+
+          const safeDate = String(form.date||'').replace(/[^0-9-]/g,'');
+          const safeZip = (form.toZip||'job').replace(/[^0-9A-Za-z_-]/g,'');
+          doc.save(`Liberator_Quote_${safeZip}_${safeDate||'today'}.pdf`);
+        };
+
+        const d = calc();
+
+        return (
+          <AnimatePresence>
+            {isOpen && (
+              <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-brand-dark/70 backdrop-blur-md" onClick={onClose}>
+                <motion.div initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.95}}
+                  className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+                  onClick={(e)=>e.stopPropagation()}>
+                  <div className="bg-brand-blue text-white p-4 flex items-center justify-between">
+                    <div className="font-bold uppercase tracking-wider text-sm">PDF Quote Generator</div>
+                    <div className="flex gap-2">
+                      <button onClick={() => { try { localStorage.removeItem('quote_generator_form_v1'); } catch(e) {} }} className="text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/20">Reset</button>
+                      <button onClick={onClose} className="text-white/90 hover:text-white font-bold px-2">X</button>
+                    </div>
+                  </div>
+
+                  <div className="p-5 overflow-y-auto grid lg:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Date</label>
+                          <input type="date" value={form.date} onChange={(e)=>set('date', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Client</label>
+                          <input value={form.clientName} onChange={(e)=>set('clientName', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">From ZIP</label>
+                          <input value={form.fromZip} onChange={(e)=>set('fromZip', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">To ZIP</label>
+                          <input value={form.toZip} onChange={(e)=>set('toZip', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Pickup Address (optional)</label>
+                        <input value={form.pickupAddress} onChange={(e)=>set('pickupAddress', e.target.value)} className="w-full p-2 border rounded" />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Items (one per line)</label>
+                        <textarea value={form.items} onChange={(e)=>set('items', e.target.value)} className="w-full p-2 border rounded h-24" />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Notes</label>
+                        <textarea value={form.notes} onChange={(e)=>set('notes', e.target.value)} className="w-full p-2 border rounded h-20" />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total $</label>
+                          <input type="number" value={form.totalPrice} onChange={(e)=>set('totalPrice', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Bracket</label>
+                          <select value={form.bracket} onChange={(e)=>set('bracket', e.target.value)} className="w-full p-2 border rounded">
+                            <option value={0.25}>1/4 Truck</option>
+                            <option value={0.5}>1/2 Truck</option>
+                            <option value={0.75}>3/4 Truck</option>
+                            <option value={1}>Full Truck</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Truck yd³</label>
+                          <input type="number" value={form.truckCapacityYd} onChange={(e)=>set('truckCapacityYd', e.target.value)} className="w-full p-2 border rounded" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Logo (PNG/JPG)</label>
+                        <input type="file" accept="image/*" onChange={(e)=>onLogoChange(e.target.files?.[0])} className="w-full" />
+                        <p className="text-[11px] text-gray-500 mt-1">Optional. If you don’t upload a logo, the PDF will still generate.</p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Signatures</label>
+                        <button onClick={() => set('showSignatures', !form.showSignatures)} className={`px-3 py-1 rounded text-xs font-bold ${form.showSignatures ? 'bg-brand-green text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          {form.showSignatures ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={generatePdf} className="flex-1 bg-brand-green text-white font-bold py-3 rounded-lg shadow">Generate & Download PDF</button>
+                        <button onClick={onClose} className="px-4 py-3 rounded-lg border font-bold">Close</button>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 border rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-bold text-brand-blue">Live Calculations</div>
+                        <div className="text-sm font-extrabold">Total: ${Math.round(Number(form.totalPrice)||0)}</div>
+                      </div>
+
+                      <div className="p-3 bg-white rounded-lg border">
+                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Volume Math</div>
+                        <div className="text-sm text-gray-700">
+                          Sofa {d.sofa.toFixed(0)} ft³ + Dresser {d.dresser.toFixed(0)} ft³ + Garage {d.garage.toFixed(0)} ft³ = <b>{d.totalCf.toFixed(0)} ft³</b>
+                        </div>
+                        <div className="text-sm text-gray-700 mt-1">
+                          {d.totalCf.toFixed(0)} ÷ 27 = <b>{d.totalYd.toFixed(1)} yd³</b> (Bracket capacity: <b>{d.bracketYd.toFixed(1)} yd³</b>)
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-white rounded-lg border">
+                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Bracket</div>
+                        <div className="text-sm text-gray-700">
+                          Truck {d.cap.toFixed(0)} yd³ × {Number(d.bracket).toFixed(2)} = <b>{d.bracketYd.toFixed(1)} yd³</b>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-white rounded-lg border space-y-2">
+                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Company Expenses (Included)</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Vehicle $</label>
+                            <input type="number" value={form.vehicleCost} onChange={(e)=>set('vehicleCost', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Helpers $</label>
+                            <input type="number" value={form.helperCost} onChange={(e)=>set('helperCost', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Dump $</label>
+                            <input type="number" value={form.dumpFee} onChange={(e)=>set('dumpFee', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Misc $</label>
+                            <input type="number" value={form.miscCost} onChange={(e)=>set('miscCost', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                        </div>
+                        <div className="text-sm font-extrabold text-brand-blue">
+                          Total expenses: ${d.expenses.toFixed(0)}
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-white rounded-lg border">
+                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Item Volumes (edit)</div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Sofa ft³</label>
+                            <input type="number" value={form.sofaCf} onChange={(e)=>set('sofaCf', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Dresser ft³</label>
+                            <input type="number" value={form.dresserCf} onChange={(e)=>set('dresserCf', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-500 font-bold uppercase">Garage ft³</label>
+                            <input type="number" value={form.garageCf} onChange={(e)=>set('garageCf', e.target.value)} className="w-full p-2 border rounded" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-gray-500">
+                        Pro tip: keep notes short to guarantee one-page PDFs.
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        );
+      };
+
 
       const App = () => <AdminProvider><AppContent /></AdminProvider>;
       const root = ReactDOM.createRoot(document.getElementById('root'));
