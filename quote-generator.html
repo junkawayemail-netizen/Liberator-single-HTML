@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Liberator – PDF Quote Generator</title>
+  <style>
+    :root { --bg:#0b1220; --card:#111a2e; --text:#e7ecff; --muted:#aab3d6; --line:#233055; --accent:#2b6cff; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:linear-gradient(180deg,#070c18,#0b1220); color:var(--text); }
+    .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px 56px; }
+    .top { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+    h1 { font-size: 22px; margin: 0; }
+    .sub { color: var(--muted); margin:6px 0 0; font-size: 13px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top:14px; }
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr;} }
+    .card { background: rgba(17,26,46,.92); border:1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    label { display:block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+    input, select, textarea { width: 100%; box-sizing:border-box; padding:10px 10px; border-radius: 12px; border:1px solid #2a3763; background:#0c1326; color: var(--text); }
+    textarea { min-height: 64px; resize: vertical; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 700px){ .row,.row3{grid-template-columns:1fr;} }
+    .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px; }
+    button { border:0; padding: 10px 14px; border-radius: 12px; background: var(--accent); color: white; font-weight: 650; cursor:pointer; }
+    button.secondary { background:#1a2546; border:1px solid #2a3763; }
+    .preview { background:#0c1326; border:1px dashed #2a3763; border-radius: 16px; padding: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .small { font-size: 12px; color: var(--muted); }
+    .pill { display:inline-block; padding: 4px 8px; border-radius: 999px; border:1px solid #2a3763; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>PDF Quote Generator</h1>
+        <div class="sub">Generates a downloadable PDF in-browser (no login, no backend). Save and share the PDF however you want (Dropbox, email, etc.).</div>
+      </div>
+      <div class="small">Liberator Junk Removal</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin:0 0 6px;font-size:16px;">Job Details</h2>
+
+        <label>Company Name</label>
+        <input id="companyName" value="LIBERATOR JUNK REMOVAL" />
+
+        <label>Title (PDF)</label>
+        <input id="docTitle" value="JUNK REMOVAL QUOTE" />
+
+        <div class="row">
+          <div>
+            <label>Date</label>
+            <input id="quoteDate" type="date" />
+          </div>
+          <div>
+            <label>Client Name</label>
+            <input id="clientName" placeholder="Junk Removal Customer" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>From ZIP</label>
+            <input id="fromZip" value="94133" />
+          </div>
+          <div>
+            <label>To ZIP</label>
+            <input id="toZip" value="94805" />
+          </div>
+        </div>
+
+        <label>Notes (customer-facing)</label>
+        <textarea id="notes">Includes labor, transportation, and disposal. Double-drive may apply depending on routing.</textarea>
+
+        <div class="row">
+          <div>
+            <label>Total Price (Customer)</label>
+            <input id="totalPrice" type="number" value="399" />
+          </div>
+          <div>
+            <label>Truck Bracket</label>
+            <select id="truckBracket">
+              <option value="0.25">1/4 Truck</option>
+              <option value="0.50" selected>1/2 Truck</option>
+              <option value="0.75">3/4 Truck</option>
+              <option value="1.00">Full Truck</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Standard Truck Capacity (cubic yards)</label>
+        <input id="truckCapacity" type="number" value="14" />
+
+        <label>Logo (PNG/JPG) – optional</label>
+        <input id="logoFile" type="file" accept="image/*" />
+
+        <div class="btns">
+          <button id="btnRecalc" class="secondary" type="button">Recalculate</button>
+          <button id="btnDownload" type="button">Generate PDF & Download</button>
+        </div>
+
+        <p class="small">Tip: Keep notes + item list concise to guarantee a single-page PDF.</p>
+      </div>
+
+      <div class="card">
+        <h2 style="margin:0 0 6px;font-size:16px;">Items & Calculations</h2>
+
+        <div class="row3">
+          <div>
+            <label>Sofa Volume (ft³)</label>
+            <input id="sofaCf" type="number" value="42" />
+          </div>
+          <div>
+            <label>Dresser Volume (ft³)</label>
+            <input id="dresserCf" type="number" value="30" />
+          </div>
+          <div>
+            <label>Garage/Junk Volume (ft³)</label>
+            <input id="garageCf" type="number" value="90" />
+          </div>
+        </div>
+
+        <label>Item List (customer-facing)</label>
+        <textarea id="itemList">Sofa
+Old dresser
+Junk from garage</textarea>
+
+        <h3 style="margin:14px 0 6px;font-size:14px;">Company Expense Breakdown (no revenue)</h3>
+        <div class="row3">
+          <div>
+            <label>Vehicle Expense ($)</label>
+            <input id="vehicleCost" type="number" value="35" />
+          </div>
+          <div>
+            <label>Helper Cost ($)</label>
+            <input id="helperCost" type="number" value="50" />
+          </div>
+          <div>
+            <label>Dump Fee ($)</label>
+            <input id="dumpFee" type="number" value="140" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Misc / Supplies ($)</label>
+            <input id="miscCost" type="number" value="15" />
+          </div>
+          <div>
+            <label>Signatures on PDF</label>
+            <select id="showSigs">
+              <option value="yes" selected>Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="preview" style="margin-top:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <div>
+              <div class="pill">Preview</div>
+              <div class="small">Math + totals update as you edit.</div>
+            </div>
+            <div class="mono" id="pTotalPrice" style="font-size:18px;font-weight:800;"></div>
+          </div>
+          <div style="margin-top:10px;" class="mono" id="pVol"></div>
+          <div style="margin-top:10px;" class="mono" id="pBracket"></div>
+          <div style="margin-top:10px;" class="mono" id="pExpenses"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    (function init(){
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      $('quoteDate').value = `${yyyy}-${mm}-${dd}`;
+      recalc();
+    })();
+
+    function num(id){
+      const v = parseFloat($(id).value);
+      return Number.isFinite(v) ? v : 0;
+    }
+
+    function recalc(){
+      const sofa = num('sofaCf');
+      const dresser = num('dresserCf');
+      const garage = num('garageCf');
+      const totalCf = sofa + dresser + garage;
+      const totalYd = totalCf / 27;
+
+      const capYd = num('truckCapacity') || 14;
+      const bracket = parseFloat($('truckBracket').value || '0.5');
+      const bracketYd = capYd * bracket;
+
+      const vehicle = num('vehicleCost');
+      const helper = num('helperCost');
+      const dump = num('dumpFee');
+      const misc = num('miscCost');
+      const expenses = vehicle + helper + dump + misc;
+
+      $('pTotalPrice').textContent = `Customer Total: $${Math.round(num('totalPrice'))}`;
+      $('pVol').textContent = `Volume: ${totalCf.toFixed(0)} ft³ ÷ 27 = ${totalYd.toFixed(1)} yd³`;
+      $('pBracket').textContent = `Bracket: ${capYd.toFixed(0)} yd³ × ${bracket.toFixed(2)} = ${bracketYd.toFixed(1)} yd³ (fits: ${totalYd.toFixed(1)} yd³)`;
+      $('pExpenses').textContent = `Expenses: $${vehicle.toFixed(0)} vehicle + $${helper.toFixed(0)} helpers + $${dump.toFixed(0)} dump + $${misc.toFixed(0)} misc = $${expenses.toFixed(0)}`;
+
+      return { totalCf, totalYd, capYd, bracket, bracketYd, expenses };
+    }
+
+    ['sofaCf','dresserCf','garageCf','truckCapacity','truckBracket','vehicleCost','helperCost','dumpFee','miscCost','totalPrice']
+      .forEach(id => {
+        $(id).addEventListener('input', recalc);
+        $(id).addEventListener('change', recalc);
+      });
+    $('btnRecalc').addEventListener('click', recalc);
+
+    function readLogoAsDataURL(file){
+      return new Promise((resolve) => {
+        if (!file) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function wrapText(doc, text, x, y, maxWidth, lineHeight){
+      const lines = doc.splitTextToSize(text, maxWidth);
+      lines.forEach((ln)=>{ doc.text(ln, x, y); y += lineHeight; });
+      return y;
+    }
+
+    $('btnDownload').addEventListener('click', async () => {
+      const { jsPDF } = window.jspdf || {};
+      if (!jsPDF) return alert('jsPDF not loaded.');
+      const doc = new jsPDF({ unit:'pt', format:'letter' });
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const left = 48, right = 48, top = 44;
+      const maxW = pageW - left - right;
+      let y = top;
+
+      const companyName = $('companyName').value.trim() || 'LIBERATOR JUNK REMOVAL';
+      const title = $('docTitle').value.trim() || 'JUNK REMOVAL QUOTE';
+      const date = $('quoteDate').value || '';
+      const client = ($('clientName').value || 'Junk Removal Customer').trim();
+      const fromZip = $('fromZip').value.trim();
+      const toZip = $('toZip').value.trim();
+      const notes = $('notes').value.trim();
+
+      const itemList = $('itemList').value.trim();
+      const itemsLines = itemList.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+      const sofa = num('sofaCf'), dresser = num('dresserCf'), garage = num('garageCf');
+      const totalCf = sofa + dresser + garage;
+      const totalYd = totalCf / 27;
+
+      const capYd = num('truckCapacity') || 14;
+      const bracket = parseFloat($('truckBracket').value || '0.5');
+      const bracketYd = capYd * bracket;
+      const bracketLabel = bracket === 0.25 ? '1/4 Truck' : bracket === 0.5 ? '1/2 Truck' : bracket === 0.75 ? '3/4 Truck' : 'Full Truck';
+
+      const totalPrice = Math.round(num('totalPrice'));
+      const showSigs = $('showSigs').value === 'yes';
+
+      const vehicle = num('vehicleCost');
+      const helper = num('helperCost');
+      const dump = num('dumpFee');
+      const misc = num('miscCost');
+      const expenses = vehicle + helper + dump + misc;
+
+      const logoData = await readLogoAsDataURL($('logoFile').files?.[0]);
+
+      // Header
+      if (logoData){
+        try { doc.addImage(logoData, 'PNG', (pageW-200)/2, y, 200, 80); y += 92; } catch(e) {}
+      }
+      doc.setFont('helvetica','bold'); doc.setFontSize(20);
+      doc.text(companyName, pageW/2, y, { align:'center' }); y += 26;
+      doc.setFontSize(16);
+      doc.text(title, pageW/2, y, { align:'center' }); y += 18;
+      doc.setDrawColor(35,48,85); doc.setLineWidth(1);
+      doc.line(left, y, pageW-right, y); y += 18;
+
+      // Meta
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      doc.text(`Date: ${date}`, left, y);
+      doc.text(`Client: ${client}`, pageW-right, y, { align:'right' }); y += 16;
+      doc.text(`Route: ${fromZip} → ${toZip}`, left, y); y += 16;
+
+      // Scope
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text('Scope of Work', left, y); y += 16;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      itemsLines.forEach(it => { doc.text(`• ${it}`, left, y); y += 14; });
+      doc.text('• Includes labor, transportation, and disposal', left, y); y += 14;
+      if (notes) { y += 2; y = wrapText(doc, notes, left, y, maxW, 14); }
+      y += 10;
+
+      // Pricing
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text('Pricing Summary', left, y); y += 16;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      doc.text(`Bracket: ${bracketLabel} (truck ≈ ${capYd.toFixed(0)} yd³; bracket ≈ ${bracketYd.toFixed(1)} yd³)`, left, y); y += 14;
+
+      // Calculations
+      doc.setFont('helvetica','bold'); doc.text('Calculations', left, y); y += 14;
+      doc.setFont('helvetica','normal');
+      doc.text(`Volumes: Sofa ${sofa.toFixed(0)} ft³ + Dresser ${dresser.toFixed(0)} ft³ + Garage ${garage.toFixed(0)} ft³ = ${totalCf.toFixed(0)} ft³`, left, y); y += 14;
+      doc.text(`Convert: ${totalCf.toFixed(0)} ÷ 27 = ${totalYd.toFixed(1)} yd³ (fits bracket: ${bracketYd.toFixed(1)} yd³)`, left, y); y += 16;
+
+      // Total bar
+      const barH = 34;
+      doc.setFillColor(0,44,95);
+      doc.roundedRect(left, y, maxW, barH, 10, 10, 'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold'); doc.setFontSize(17);
+      doc.text('TOTAL PRICE:', left+14, y+23);
+      doc.text(`$${totalPrice}`, pageW-right-14, y+23, { align:'right' });
+      doc.setTextColor(0,0,0);
+      y += barH + 16;
+
+      if (showSigs){
+        doc.setFont('helvetica','bold'); doc.setFontSize(12);
+        doc.text('Signatures', left, y); y += 16;
+        doc.setFont('helvetica','normal'); doc.setFontSize(11);
+        doc.text('Customer Signature: ________________________________', left, y); y += 18;
+        doc.text('Liberator Representative: ___________________________', left, y); y += 18;
+      }
+
+      // Expenses (no revenue)
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text('Company Expense Breakdown (Included)', left, y); y += 14;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      doc.text(`• Vehicle expense: $${vehicle.toFixed(0)}`, left, y); y += 14;
+      doc.text(`• Helpers: $${helper.toFixed(0)}`, left, y); y += 14;
+      doc.text(`• Dump fee: $${dump.toFixed(0)}`, left, y); y += 14;
+      doc.text(`• Misc / supplies: $${misc.toFixed(0)}`, left, y); y += 14;
+      doc.setFont('helvetica','bold');
+      doc.text(`Total company expenses (included): $${expenses.toFixed(0)}`, left, y);
+
+      // Footer
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      doc.setTextColor(120,130,160);
+      doc.text('Generated by Liberator Quote Generator', pageW/2, pageH-22, { align:'center' });
+      doc.setTextColor(0,0,0);
+
+      doc.save(`Liberator_Quote_${toZip || 'job'}_${date || 'today'}.pdf`);
+    });
+  </script>
+</body>
+</html>
